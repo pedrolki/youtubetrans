@@ -124,11 +124,10 @@ with col1:
     st.subheader("Video Input")
     url = st.text_input("Enter YouTube URL")
     
-    if url:
+        if url:
         video_id = get_video_id(url)
         if video_id:
-            # In the video display section, change this line:
-st.video(f"[https://www.youtube.com/watch?v={video_id}")](https://www.youtube.com/watch?v={video_id}"))
+            st.video(f"[https://www.youtube.com/watch?v={video_id}")](https://www.youtube.com/watch?v={video_id}"))
             
             try:
                 transcript = YouTubeTranscriptApi.get_transcript(video_id)
