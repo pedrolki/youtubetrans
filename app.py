@@ -52,7 +52,18 @@ with col1:
     if url:
         video_id = get_video_id(url)
         if video_id:
-            st.video(video_id)
+            # Display YouTube video using HTML iframe
+            video_html = f'''
+                <iframe
+                    width="100%"
+                    height="400"
+                    src="[https://www.youtube.com/embed/{video_id}"](https://www.youtube.com/embed/{video_id}")
+                    frameborder="0"
+                    allow="autoplay; encrypted-media"
+                    allowfullscreen
+                ></iframe>
+            '''
+            st.markdown(video_html, unsafe_allow_html=True)
             
             try:
                 # Get transcript
