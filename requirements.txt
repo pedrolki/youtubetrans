@@ -1,4 +1,6 @@
 flask==3.0.0
-python-dotenv==1.0.0
-google-generativeai==0.3.0
 youtube-transcript-api==0.6.1
+nltk==3.8.1
+deep-translator==1.11.4
+sentence-transformers==2.2.2
+numpy==1.24.3
