@@ -127,7 +127,8 @@ with col1:
     if url:
         video_id = get_video_id(url)
         if video_id:
-            st.video(f"[https://www.youtube.com/watch?v={video_id}")](https://www.youtube.com/watch?v={video_id}"))
+            # Fixed video URL line
+            st.video(video_id)
             
             try:
                 transcript = YouTubeTranscriptApi.get_transcript(video_id)
