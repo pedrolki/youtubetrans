@@ -1,25 +1,14 @@
 import streamlit as st
 import nltk
-from nltk.tokenize import sent_tokenize, word_tokenize
-from nltk.corpus import stopwords
-from nltk.metrics.distance import jaccard_distance
-from nltk.util import ngrams
-from string import punctuation
-from heapq import nlargest
+from nltk.tokenize import sent_tokenize
 from youtube_transcript_api import YouTubeTranscriptApi
 from deep_translator import GoogleTranslator
-from collections import defaultdict
 
-# Download required NLTK data
-@st.cache_resource
-def download_nltk_data():
+# Initialize NLTK
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
     nltk.download('punkt')
-    nltk.download('stopwords')
-
-download_nltk_data()
-
-# Store video context
-video_contexts = defaultdict(dict)
 
 def get_video_id(url):
     """Extract video ID from YouTube URL"""
@@ -29,74 +18,17 @@ def get_video_id(url):
         return url.split('youtu.be/')[1].split('?')[0]
     return None
 
-def summarize_text(text, per=0.3):
-    """Summarize text using NLTK"""
-    sentences = sent_tokenize(text)
-    words = word_tokenize(text.lower())
-    stop_words = set(stopwords.words('english') + list(punctuation))
-    word_freq = {}
-    
-    for word in words:
-        if word not in stop_words:
-            word_freq[word] = word_freq.get(word, 0) + 1
-    
-    sent_scores = {}
-    for sentence in sentences:
-        for word in word_tokenize(sentence.lower()):
-            if word in word_freq:
-                sent_scores[sentence] = sent_scores.get(sentence, 0) + word_freq[word]
-    
-    select_length = max(int(len(sentences) * per), 1)
-    summary = nlargest(select_length, sent_scores, key=sent_scores.get)
-    
-    return ' '.join(summary)
-
-def prepare_context(transcript):
-    """Prepare video context for Q&A"""
-    contexts = []
-    current_context = []
-    current_length = 0
-    
-    for entry in transcript:
-        current_context.append(entry['text'])
-        current_length += len(entry['text'].split())
-        
-        if current_length >= 100:
-            contexts.append({
-                'text': ' '.join(current_context),
-                'start_time': transcript[len(contexts)]['start']
-            })
-            current_context = []
-            current_length = 0
-    
-    if current_context:
-        contexts.append({
-            'text': ' '.join(current_context),
-            'start_time': transcript[-1]['start']
-        })
-    
-    return contexts
-
-def text_similarity(text1, text2):
-    """Calculate text similarity using Jaccard similarity of word sets"""
-    words1 = set(word_tokenize(text1.lower()))
-    words2 = set(word_tokenize(text2.lower()))
-    stop_words = set(stopwords.words('english') + list(punctuation))
-    words1 = words1 - stop_words
-    words2 = words2 - stop_words
-    return len(words1 & words2) / len(words1 | words2) if words1 | words2 else 0
-
-def find_best_context(query, contexts):
-    """Find most relevant context using text similarity"""
-    similarities = [text_similarity(query, ctx['text']) for ctx in contexts]
-    best_idx = max(range(len(similarities)), key=similarities.__getitem__)
-    return contexts[best_idx], similarities[best_idx]
-
 def format_time(seconds):
     """Format seconds to MM:SS"""
     minutes = int(seconds // 60)
     seconds = int(seconds % 60)
     return f"{minutes:02d}:{seconds:02d}"
+
+def summarize_text(text, per=0.3):
+    """Simple summarization by selecting first few sentences"""
+    sentences = sent_tokenize(text)
+    n_sentences = max(int(len(sentences) * per), 1)
+    return ' '.join(sentences[:n_sentences])
 
 # Streamlit UI
 st.set_page_config(page_title="YouTube Transcript Assistant", page_icon="🎥", layout="wide")
@@ -105,11 +37,6 @@ st.title("YouTube Transcript Assistant 🎥")
 
 # Sidebar
 st.sidebar.header("Options")
-ai_option = st.sidebar.selectbox(
-    "AI Processing",
-    ["Summarize", "Key Points", "Study Notes"]
-)
-
 target_lang = st.sidebar.selectbox(
     "Translation Language",
     ["en", "es", "fr", "de", "it", "pt", "nl", "ru", "ja", "ko", "zh"]
@@ -128,14 +55,8 @@ with col1:
             st.video(video_id)
             
             try:
+                # Get transcript
                 transcript = YouTubeTranscriptApi.get_transcript(video_id)
-                
-                # Prepare context for Q&A
-                contexts = prepare_context(transcript)
-                video_contexts[video_id] = {
-                    'contexts': contexts,
-                    'transcript': transcript
-                }
                 
                 # Show transcript
                 st.subheader("Transcript")
@@ -144,71 +65,28 @@ with col1:
                 
                 # Translation
                 if st.button("Translate"):
-                    translator = GoogleTranslator(source='auto', target=target_lang)
-                    chunks = [transcript_text[i:i+500] for i in range(0, len(transcript_text), 500)]
-                    translated_chunks = [translator.translate(chunk) for chunk in chunks]
-                    translated_text = ' '.join(translated_chunks)
-                    st.text_area("Translated Transcript", translated_text, height=300)
+                    try:
+                        translator = GoogleTranslator(source='auto', target=target_lang)
+                        chunks = [transcript_text[i:i+500] for i in range(0, len(transcript_text), 500)]
+                        translated_chunks = [translator.translate(chunk) for chunk in chunks]
+                        translated_text = ' '.join(translated_chunks)
+                        st.text_area("Translated Transcript", translated_text, height=300)
+                    except Exception as e:
+                        st.error(f"Translation error: {str(e)}")
                 
             except Exception as e:
                 st.error(f"Error: {str(e)}")
 
 with col2:
-    st.subheader("AI Analysis")
-    
-    if url and video_id in video_contexts:
-        # Process transcript with AI
-        text = ' '.join([t['text'] for t in video_contexts[video_id]['transcript']])
-        
-        if ai_option == "Summarize":
-            st.write("Summary:")
-            summary = summarize_text(text)
+    if url and video_id:
+        st.subheader("Summary")
+        try:
+            # Get full text for summary
+            full_text = ' '.join([t['text'] for t in transcript])
+            summary = summarize_text(full_text)
             st.write(summary)
-        
-        elif ai_option == "Key Points":
-            st.write("Key Points:")
-            summary = summarize_text(text, 0.2)
-            for point in sent_tokenize(summary):
-                st.markdown(f"• {point}")
-        
-        else:  # Study Notes
-            st.write("Study Notes:")
-            notes = summarize_text(text, 0.5)
-            st.write(notes)
-        
-        # Chat interface
-        st.subheader("Chat with Video")
-        query = st.text_input("Ask a question about the video")
-        
-        if query:
-            context = video_contexts[video_id]
-            best_context, confidence = find_best_context(
-                query,
-                context['contexts']
-            )
-            
-            st.write("Answer:")
-            st.info(f"{best_context['text']}")
-            st.caption(f"Timestamp: {format_time(best_context['start_time'])}")
-            
-            # Store chat history in session state
-            if 'chat_history' not in st.session_state:
-                st.session_state.chat_history = []
-            
-            st.session_state.chat_history.append({
-                'query': query,
-                'response': best_context['text'],
-                'timestamp': best_context['start_time']
-            })
-        
-        # Display chat history
-        if 'chat_history' in st.session_state and st.session_state.chat_history:
-            st.subheader("Chat History")
-            for item in st.session_state.chat_history:
-                st.markdown(f"**Q:** {item['query']}")
-                st.markdown(f"**A:** {item['response']}")
-                st.caption(f"Timestamp: {format_time(item['timestamp'])}")
-                st.divider()
+        except Exception as e:
+            st.error(f"Error generating summary: {str(e)}")
 
 # Footer
 st.markdown("---")
