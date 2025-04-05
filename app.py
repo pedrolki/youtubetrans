@@ -24,6 +24,44 @@ def format_time(seconds):
     seconds = int(seconds % 60)
     return f"{minutes:02d}:{seconds:02d}"
 
+def get_available_transcripts(video_id):
+    """Get list of available transcript languages"""
+    try:
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        return transcript_list
+    except Exception as e:
+        st.error(f"Error getting transcript list: {str(e)}")
+        return None
+
+def get_transcript(video_id, target_lang='en'):
+    """Get transcript in target language, translating if necessary"""
+    transcript_list = get_available_transcripts(video_id)
+    if not transcript_list:
+        return None
+
+    try:
+        # Try to get transcript in target language
+        transcript = transcript_list.find_transcript([target_lang])
+    except:
+        try:
+            # If target language not available, get any transcript and translate
+            transcript = transcript_list.find_transcript([next(iter(transcript_list._manually_created_transcripts))])
+        except:
+            # If no manual transcripts, try auto-generated ones
+            try:
+                transcript = transcript_list.find_transcript([next(iter(transcript_list._generated_transcripts))])
+            except:
+                return None
+
+    # Translate if not in target language
+    if transcript.language_code != target_lang:
+        try:
+            transcript = transcript.translate(target_lang)
+        except Exception as e:
+            st.warning(f"Could not translate to {target_lang}. Using original language.")
+
+    return transcript.fetch()
+
 def summarize_text(text, per=0.3):
     """Simple summarization by selecting first few sentences"""
     sentences = sent_tokenize(text)
@@ -38,7 +76,7 @@ st.title("YouTube Transcript Assistant 🎥")
 # Sidebar
 st.sidebar.header("Options")
 target_lang = st.sidebar.selectbox(
-    "Translation Language",
+    "Transcript Language",
     ["en", "es", "fr", "de", "it", "pt", "nl", "ru", "ja", "ko", "zh"]
 )
 
@@ -66,38 +104,36 @@ with col1:
             st.markdown(video_html, unsafe_allow_html=True)
             
             try:
-                # Get transcript
-                transcript = YouTubeTranscriptApi.get_transcript(video_id)
+                # Get transcript in desired language
+                transcript = get_transcript(video_id, target_lang)
                 
-                # Show transcript
-                st.subheader("Transcript")
-                transcript_text = "\n".join([f"{format_time(t['start'])}: {t['text']}" for t in transcript])
-                st.text_area("", transcript_text, height=300)
-                
-                # Translation
-                if st.button("Translate"):
-                    try:
-                        translator = GoogleTranslator(source='auto', target=target_lang)
-                        chunks = [transcript_text[i:i+500] for i in range(0, len(transcript_text), 500)]
-                        translated_chunks = [translator.translate(chunk) for chunk in chunks]
-                        translated_text = ' '.join(translated_chunks)
-                        st.text_area("Translated Transcript", translated_text, height=300)
-                    except Exception as e:
-                        st.error(f"Translation error: {str(e)}")
+                if transcript:
+                    # Show transcript
+                    st.subheader(f"Transcript ({target_lang})")
+                    transcript_text = "\n".join([f"{format_time(t['start'])}: {t['text']}" for t in transcript])
+                    st.text_area("", transcript_text, height=300)
+                    
+                    # Show available languages
+                    transcript_list = get_available_transcripts(video_id)
+                    if transcript_list:
+                        st.subheader("Available Languages")
+                        st.write("Manual transcripts:", ", ".join(transcript_list._manually_created_transcripts.keys()))
+                        st.write("Auto-generated:", ", ".join(transcript_list._generated_transcripts.keys()))
+                    
+                    # Summary in col2
+                    with col2:
+                        st.subheader("Summary")
+                        try:
+                            full_text = ' '.join([t['text'] for t in transcript])
+                            summary = summarize_text(full_text)
+                            st.write(summary)
+                        except Exception as e:
+                            st.error(f"Error generating summary: {str(e)}")
+                else:
+                    st.error("No transcript available for this video.")
                 
             except Exception as e:
                 st.error(f"Error: {str(e)}")
-
-with col2:
-    if url and video_id:
-        st.subheader("Summary")
-        try:
-            # Get full text for summary
-            full_text = ' '.join([t['text'] for t in transcript])
-            summary = summarize_text(full_text)
-            st.write(summary)
-        except Exception as e:
-            st.error(f"Error generating summary: {str(e)}")
 
 # Footer
 st.markdown("---")
