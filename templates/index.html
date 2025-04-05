@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Transcript Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>YouTube Transcript Generator</h1>
+        
+        <div class="input-section">
+            <input type="text" id="youtube-url" placeholder="Paste YouTube URL here">
+            <button onclick="getTranscript()">Get Transcript</button>
+        </div>
+
+        <div class="main-content">
+            <div class="video-player" id="video-player"></div>
+            
+            <div class="transcript-section">
+                <div class="transcript-controls">
+                    <select id="language-select">
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <!-- Add more languages as needed -->
+                    </select>
+                    <button onclick="translateTranscript()">Translate</button>
+                    <button onclick="copyTranscript()">Copy</button>
+                    <button onclick="downloadTranscript()">Download</button>
+                </div>
+                
+                <div class="transcript-content" id="transcript-content"></div>
+            </div>
+        </div>
+
+        <div class="ai-prompts">
+            <h3>AI Prompts</h3>
+            <select id="ai-prompt-select">
+                <option value="summarize">Summarize</option>
+                <option value="key-points">Extract Key Points</option>
+                <option value="notes">Generate Study Notes</option>
+            </select>
+            <button onclick="processWithAI()">Process</button>
+            <div id="ai-output"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
