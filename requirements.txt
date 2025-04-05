@@ -2,8 +2,3 @@ streamlit==1.31.0
 youtube-transcript-api==0.6.1
 nltk==3.8.1
 deep-translator==1.11.4
-sentence-transformers==2.2.2
-numpy>=1.26.0
-huggingface-hub>=0.20.3
-torch>=2.2.0
-transformers>=4.37.2
