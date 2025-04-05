@@ -5,7 +5,8 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Use the secret from Streamlit Cloud
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 st.set_page_config(page_title="YouTube Summarizer", layout="centered")
 
