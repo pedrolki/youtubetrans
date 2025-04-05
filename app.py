@@ -2,12 +2,12 @@ import streamlit as st
 import nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
+from nltk.metrics.distance import jaccard_distance
+from nltk.util import ngrams
 from string import punctuation
 from heapq import nlargest
 from youtube_transcript_api import YouTubeTranscriptApi
 from deep_translator import GoogleTranslator
-from sentence_transformers import SentenceTransformer
-import numpy as np
 from collections import defaultdict
 
 # Download required NLTK data
@@ -17,13 +17,6 @@ def download_nltk_data():
     nltk.download('stopwords')
 
 download_nltk_data()
-
-# Initialize the sentence transformer model
-@st.cache_resource
-def load_model():
-    return SentenceTransformer('all-MiniLM-L6-v2')
-
-model = load_model()
 
 # Store video context
 video_contexts = defaultdict(dict)
@@ -82,16 +75,21 @@ def prepare_context(transcript):
             'start_time': transcript[-1]['start']
         })
     
-    embeddings = model.encode([c['text'] for c in contexts])
-    
-    return contexts, embeddings
+    return contexts
 
-def find_best_context(query, contexts, embeddings):
-    """Find most relevant context for a query"""
-    query_embedding = model.encode([query])[0]
-    similarities = np.dot(embeddings, query_embedding)
-    best_idx = np.argmax(similarities)
-    
+def text_similarity(text1, text2):
+    """Calculate text similarity using Jaccard similarity of word sets"""
+    words1 = set(word_tokenize(text1.lower()))
+    words2 = set(word_tokenize(text2.lower()))
+    stop_words = set(stopwords.words('english') + list(punctuation))
+    words1 = words1 - stop_words
+    words2 = words2 - stop_words
+    return len(words1 & words2) / len(words1 | words2) if words1 | words2 else 0
+
+def find_best_context(query, contexts):
+    """Find most relevant context using text similarity"""
+    similarities = [text_similarity(query, ctx['text']) for ctx in contexts]
+    best_idx = max(range(len(similarities)), key=similarities.__getitem__)
     return contexts[best_idx], similarities[best_idx]
 
 def format_time(seconds):
@@ -127,17 +125,15 @@ with col1:
     if url:
         video_id = get_video_id(url)
         if video_id:
-            # Fixed video URL line
             st.video(video_id)
             
             try:
                 transcript = YouTubeTranscriptApi.get_transcript(video_id)
                 
                 # Prepare context for Q&A
-                contexts, embeddings = prepare_context(transcript)
+                contexts = prepare_context(transcript)
                 video_contexts[video_id] = {
                     'contexts': contexts,
-                    'embeddings': embeddings,
                     'transcript': transcript
                 }
                 
@@ -188,8 +184,7 @@ with col2:
             context = video_contexts[video_id]
             best_context, confidence = find_best_context(
                 query,
-                context['contexts'],
-                context['embeddings']
+                context['contexts']
             )
             
             st.write("Answer:")
