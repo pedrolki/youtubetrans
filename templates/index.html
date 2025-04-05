@@ -47,7 +47,15 @@
             <div id="ai-output"></div>
         </div>
     </div>
-
+<!-- Add this inside the main-content div, after the transcript-section -->
+<div class="chat-section">
+    <h3>Chat with Video</h3>
+    <div id="chat-messages"></div>
+    <div class="chat-input">
+        <input type="text" id="chat-input" placeholder="Ask a question about the video...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+</div>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
