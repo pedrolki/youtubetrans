@@ -1,4 +1,4 @@
-streamlit==1.31.0
-youtube-transcript-api==0.6.1
-nltk==3.8.1
-deep-translator==1.11.4
+streamlit
+openai
+youtube-transcript-api
+python-dotenv
