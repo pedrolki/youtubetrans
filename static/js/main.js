@@ -155,3 +155,114 @@ function formatTime(seconds) {
     const ss = date.getUTCSeconds();
     return `${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
 }
+// Add these functions at the end of the file
+
+let currentVideoId = null;
+
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const messages = document.getElementById('chat-messages');
+    const query = input.value.trim();
+    
+    if (!query) return;
+    if (!currentVideoId) {
+        alert('Please load a video transcript first!');
+        return;
+    }
+    
+    // Add user message
+    messages.innerHTML += `
+        <div class="message user-message">
+            ${query}
+        </div>
+    `;
+    
+    input.value = '';
+    
+    try {
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                video_id: currentVideoId,
+                query: query
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Add bot message with clickable timestamp
+        messages.innerHTML += `
+            <div class="message bot-message">
+                ${data.answer}
+                <br>
+                <span class="timestamp-link" onclick="player.seekTo(${data.timestamp})">
+                    Jump to ${formatTime(data.timestamp)}
+                </span>
+            </div>
+        `;
+        
+    } catch (error) {
+        messages.innerHTML += `
+            <div class="message bot-message error">
+                Error: ${error.message}
+            </div>
+        `;
+    }
+    
+    // Scroll to bottom
+    messages.scrollTop = messages.scrollHeight;
+}
+
+// Update getTranscript function to store video ID
+async function getTranscript() {
+    const urlInput = document.getElementById('youtube-url');
+    const transcriptContent = document.getElementById('transcript-content');
+    
+    try {
+        currentVideoId = getVideoId(urlInput.value);
+        if (!currentVideoId) {
+            throw new Error('Invalid YouTube URL');
+        }
+        
+        const response = await fetch('/get_transcript', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url: urlInput.value })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Update video player
+        player.loadVideoById(currentVideoId);
+        
+        // Display transcript
+        displayTranscript(data.transcript);
+        
+        // Clear chat messages
+        document.getElementById('chat-messages').innerHTML = '';
+        
+    } catch (error) {
+        transcriptContent.innerHTML = `Error: ${error.message}`;
+        currentVideoId = null;
+    }
+}
+
+// Add event listener for Enter key in chat input
+document.getElementById('chat-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        sendMessage();
+    }
+});
